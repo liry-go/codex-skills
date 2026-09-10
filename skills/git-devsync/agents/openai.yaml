@@ -1,0 +1,4 @@
+interface:
+  display_name: "Git Dev Sync"
+  short_description: "Sync pending branch commits onto latest dev"
+  default_prompt: "Use $git-devsync to sync pending commits through a refreshed _devsync branch, merge the result back to dev, and return to the source feature branch."
