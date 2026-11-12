@@ -1,0 +1,5 @@
+# 将此设置合并到使用的 Codex 配置。已有同名服务器时更新该段。
+[mcp_servers.figma]
+url = "https://mcp.figma.com/mcp"
+enabled_tools = ["get_metadata", "get_screenshot", "download_assets"]
+# 按钮范式确需属性时，可明确把 "get_design_context" 加入 enabled_tools。

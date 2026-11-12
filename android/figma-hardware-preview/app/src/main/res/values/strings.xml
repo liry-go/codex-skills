@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name" translatable="false">Figma Hardware Preview</string>
+    <string name="empty_preview">Send a preview from Codex over USB.</string>
+</resources>

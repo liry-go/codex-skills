@@ -7,6 +7,7 @@
 | 技能 | 用途 |
 | --- | --- |
 | [git-devsync](skills/git-devsync/SKILL.md) | 将功能分支尚未同步的提交增量 cherry-pick 到 `_devsync` 分支，处理冲突并验证后合入本地 `dev`，再返回原功能分支。 |
+| [figma-hardware-preview](skills/figma-hardware-preview/SKILL.md) | 在 USB 连接的 Android 样机上预览指定 Figma Frame，可按设计范式加按钮按压反馈。 |
 
 ## 在 Codex 中安装
 
@@ -47,6 +48,18 @@ Codex 也支持把整个技能目录放到用户级 `~/.agents/skills/` 下。�
 - 同步和合回前工作区需要干净。遇到冲突时保留现场，解决并验证后继续。
 - 技能不会自动 push；远端推送需要单独提出。
 
+## 使用 figma-hardware-preview
+
+在 Codex 中发送以下安装请求。
+
+```text
+使用 $skill-installer 安装 https://github.com/liry-go/codex-skills/tree/main/skills/figma-hardware-preview
+```
+
+样机首次安装 [Android 预览器 APK](https://github.com/liry-go/codex-skills/releases/tag/figma-hardware-preview-v1.0.0)。后续提供 Figma Frame 链接或本地 PNG 即可通过 USB 更新画面。默认静态展示，按需应用用户指定的按钮范式。Figma 工具必须限制在只读白名单内。详见 [安装和使用](skills/figma-hardware-preview/references/setup.md)。
+
+预览器源码在 [android/figma-hardware-preview](android/figma-hardware-preview)。构建需要 JDK 17+、Android SDK 35 和 Build Tools 35.0.0。在该目录执行 `./gradlew :app:assembleRelease :app:lintRelease`。发布时用 Android SDK 的 `zipalign` 与 `apksigner` 对齐并签名 APK。升级沿用原发布签名。
+
 ## 更新技能
 
 通过安装器安装的副本不会随着本仓库更新而自动更新。需要新版本时，可让 Codex 对比仓库版本与本机版本，保留本地定制后更新。
@@ -60,3 +73,5 @@ skills/
     ├── agents/openai.yaml
     └── scripts/devsync.sh
 ```
+
+`figma-hardware-preview` 的 Skill 目录包含 `scripts/preview.py`、只读 MCP 配置与使用说明。Android 预览器独立发布。

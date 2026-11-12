@@ -1,0 +1,4 @@
+interface:
+  display_name: "Figma Hardware Preview"
+  short_description: "在 Android 样机上预览 Figma 设计"
+  default_prompt: "使用 $figma-hardware-preview，将我指定的 Figma Frame 显示在 USB 连接的 Android 样机上。"
