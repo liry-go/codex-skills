@@ -18,5 +18,5 @@ description: Preview a specified Figma Frame or its exported PNG on a USB-connec
 
 1. 确认目标 Frame。Figma 链接以 `node-id` 定位。使用完整 Frame 的原始导出 PNG，避免编辑器界面、光标和批注。工具只能显示而无法保存原图时，请用户提供手动导出文件。
 2. 默认打包静态图。指定按钮范式时，按 [按钮与预览包说明](references/preview-format.md) 使用原设计区域、组件素材和指定状态。范式可应用于整页或局部，按每个组件的原始样式适配。缺少可信状态或底图的区域保留静态，汇报位置和原因。
-3. 使用本 Skill 的 `scripts/preview.py` 打包并通过 USB 部署。目标样机首次部署时，脚本会从 GitHub Release 自动下载、校验并安装预览器。连接多台 USB 设备时明确选择序列号。命令见 [安装与使用](references/setup.md)。
+3. 通过本 Skill 的启动脚本打包并通过 USB 部署。macOS/Linux 用 `scripts/preview.sh`，Windows 用 `scripts/preview.ps1`。脚本复用已有的 Python 和 adb，缺少时会自动准备。目标样机首次部署时，脚本会从 GitHub Release 下载、校验并安装预览器。连接多台 USB 设备时明确选择序列号。命令见 [安装与使用](references/setup.md)。
 4. 回读部署确认，截取实机画面并检查比例、留边和视觉一致性。交互版本同时检查按下、松手和取消；能实测就实测。汇报已完成的预览、使用的按钮范式及待核对之处。

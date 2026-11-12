@@ -4,8 +4,11 @@
 import argparse
 import hashlib
 import json
+import os
+import platform
 import re
 import shlex
+import shutil
 import struct
 import subprocess
 import sys
@@ -14,6 +17,8 @@ import time
 import uuid
 import zipfile
 import zlib
+from functools import cache
+from io import BytesIO
 from pathlib import Path
 from urllib.request import urlopen
 
@@ -23,6 +28,12 @@ VIEWER_URL = ("https://github.com/liry-go/codex-skills/releases/download/"
               "figma-hardware-preview-v1.0.0/" + VIEWER_APK)
 VIEWER_SHA256 = "96893678317791f58d301d4231aef9569d9b30ba5cb95ffe6286b16485a1bec9"
 MAX_APK = 8 * 1024 * 1024
+ADB_RELEASE = "37.0.1"
+ADB_ARCHIVES = {
+    "darwin": "ee39ad5967e95c2a07f04dbcbde96b1a0c916ba376096db5d2f498b7727a5d1d",
+    "linux": "d230f13842f60f782a8645f9c813f8f845bf36089ea7289f28c48f17979313f1",
+    "win": "45f4d63113e895ebde0c90f194099a4676b6ac653bd28d54314a9e022bbc1a99",
+}
 PNG_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,91}\.png")
 MAX_BUNDLE = 24 * 1024 * 1024
 MAX_MANIFEST = 64 * 1024
@@ -172,8 +183,66 @@ def verify_bundle(path):
                 "Preview ZIP contains unused files")
 
 
+def verified_download(url, sha256, maximum, name):
+    try:
+        with urlopen(url, timeout=45) as response:
+            payload = response.read(maximum + 1)
+    except OSError as error:
+        raise ValueError(f"Could not download {name}: {error}") from error
+    require(len(payload) <= maximum and hashlib.sha256(payload).hexdigest() == sha256,
+            f"{name} failed SHA-256 verification")
+    return payload
+
+
+@cache
+def adb_executable():
+    installed = shutil.which("adb")
+    if installed:
+        return installed
+
+    system, cpu = platform.system(), platform.machine().lower()
+    executable = "adb.exe" if system == "Windows" else "adb"
+    for sdk in ("ANDROID_HOME", "ANDROID_SDK_ROOT"):
+        if os.environ.get(sdk):
+            installed_sdk = Path(os.environ[sdk]) / "platform-tools" / executable
+            if installed_sdk.is_file():
+                return str(installed_sdk.resolve())
+
+    archive_id = {
+        ("Darwin", "arm64"): "darwin", ("Darwin", "x86_64"): "darwin",
+        ("Linux", "x86_64"): "linux", ("Windows", "amd64"): "win",
+        ("Windows", "arm64"): "win",
+    }.get((system, cpu))
+    require(archive_id, f"Automatic adb setup is unavailable for {system} {cpu}. Put a compatible adb on PATH.")
+
+    default_cache = (Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local")
+                     if system == "Windows" else Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache"))
+    cache_dir = Path(os.environ.get("FIGMA_PREVIEW_CACHE_DIR") or default_cache / "figma-hardware-preview")
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    target = cache_dir / f"adb-{ADB_RELEASE}-{archive_id}"
+    installed = target / executable
+    if not installed.is_file():
+        print("Downloading Android SDK Platform-Tools from Google", file=sys.stderr, flush=True)
+        url = f"https://dl.google.com/android/repository/platform-tools_r{ADB_RELEASE}-{archive_id}.zip"
+        payload = verified_download(url, ADB_ARCHIVES[archive_id], 32 * 1024 * 1024, "Platform-Tools")
+        with tempfile.TemporaryDirectory(prefix=".adb-", dir=cache_dir) as staging:
+            with zipfile.ZipFile(BytesIO(payload)) as archive:
+                archive.extractall(staging)
+            tools = Path(staging) / "platform-tools"
+            downloaded = tools / executable
+            require(downloaded.is_file(), "Platform-Tools archive does not contain adb")
+            if archive_id != "win":
+                downloaded.chmod(0o755)
+            try:
+                tools.rename(target)
+            except OSError:
+                if not installed.is_file():
+                    raise
+    return str(installed.resolve())
+
+
 def adb_run(command, *, data=None, timeout=60, check=True):
-    result = subprocess.run(["adb", *command], input=data, capture_output=True, timeout=timeout)
+    result = subprocess.run([adb_executable(), *command], input=data, capture_output=True, timeout=timeout)
     if check and result.returncode:
         details = (result.stderr or result.stdout).decode(errors="replace").strip()
         raise ValueError(details or f"ADB exited with code {result.returncode}")
@@ -219,13 +288,7 @@ def ensure_viewer(serial):
             raise ValueError(f"The installed viewer on {serial} is not accessible via ADB. {error}") from error
 
     print(f"Downloading the viewer for USB device {serial} from GitHub Release", flush=True)
-    try:
-        with urlopen(VIEWER_URL, timeout=30) as response:
-            payload = response.read(MAX_APK + 1)
-    except OSError as error:
-        raise ValueError(f"Could not download the viewer from GitHub: {error}") from error
-    require(len(payload) <= MAX_APK and hashlib.sha256(payload).hexdigest() == VIEWER_SHA256,
-            "Viewer APK failed SHA-256 verification")
+    payload = verified_download(VIEWER_URL, VIEWER_SHA256, MAX_APK, "Viewer APK")
 
     with tempfile.TemporaryDirectory(prefix="figma-hardware-preview-") as directory:
         apk = Path(directory) / VIEWER_APK

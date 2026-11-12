@@ -1,0 +1,7 @@
+# Astral python-build-standalone 20261110, CPython 3.13.18. Platform, build target, SHA-256.
+Darwin-arm64 aarch64-apple-darwin 7a2384641584ab9984221fcb0fc9265df465922af71be71410529e2a9c3f0540
+Darwin-x86_64 x86_64-apple-darwin d27d59a722db9f69926eb6d9564071247221f45a04da920ea7f3001c97e32f9b
+Linux-aarch64 aarch64-unknown-linux-gnu 55c00325f7c1fddf325dfc621aabdfbbac4dc54adda224af88ec411dc12db239
+Linux-x86_64 x86_64-unknown-linux-gnu f2d2199eb25880e07863b391cf7124e7ffa1338b0d65600dfcec117c4223a7fb
+Windows-AMD64 x86_64-pc-windows-msvc 2e0fed09d48989f64c9305da9ff2d37a41c0d13ab2aa6283405b2b620dfbf805
+Windows-ARM64 aarch64-pc-windows-msvc 0a8840071810ddb8565256cd406b466d4e9dc6dc523395a5477880dbc4f67eb3
