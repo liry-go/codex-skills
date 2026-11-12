@@ -9,13 +9,20 @@ import shlex
 import struct
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 import zipfile
 import zlib
 from pathlib import Path
+from urllib.request import urlopen
 
 PACKAGE = "dev.local.figmapreview"
+VIEWER_APK = "figma-hardware-preview.apk"
+VIEWER_URL = ("https://github.com/liry-go/codex-skills/releases/download/"
+              "figma-hardware-preview-v1.0.0/" + VIEWER_APK)
+VIEWER_SHA256 = "96893678317791f58d301d4231aef9569d9b30ba5cb95ffe6286b16485a1bec9"
+MAX_APK = 8 * 1024 * 1024
 PNG_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,91}\.png")
 MAX_BUNDLE = 24 * 1024 * 1024
 MAX_MANIFEST = 64 * 1024
@@ -195,19 +202,47 @@ def app_shell(serial, command, **kwargs):
                     shlex.quote(command)], **kwargs)
 
 
+def install_viewer(serial, apk):
+    result = adb_run(["-s", serial, "install", "-r", str(apk)], timeout=120)
+    require(b"Success" in result.stdout, result.stdout.decode(errors="replace"))
+    app_shell(serial, "true")
+    print(f"Viewer installed on USB device {serial}")
+
+
+def ensure_viewer(serial):
+    try:
+        app_shell(serial, "true")
+        return
+    except ValueError as error:
+        result = adb_run(["-s", serial, "shell", "pm", "list", "packages", PACKAGE])
+        if f"package:{PACKAGE}".encode() in result.stdout.splitlines():
+            raise ValueError(f"The installed viewer on {serial} is not accessible via ADB. {error}") from error
+
+    print(f"Downloading the viewer for USB device {serial} from GitHub Release", flush=True)
+    try:
+        with urlopen(VIEWER_URL, timeout=30) as response:
+            payload = response.read(MAX_APK + 1)
+    except OSError as error:
+        raise ValueError(f"Could not download the viewer from GitHub: {error}") from error
+    require(len(payload) <= MAX_APK and hashlib.sha256(payload).hexdigest() == VIEWER_SHA256,
+            "Viewer APK failed SHA-256 verification")
+
+    with tempfile.TemporaryDirectory(prefix="figma-hardware-preview-") as directory:
+        apk = Path(directory) / VIEWER_APK
+        apk.write_bytes(payload)
+        install_viewer(serial, apk)
+
+
 def deploy(args):
     verify_bundle(args.bundle)
     serial = usb_device(args.serial)
+    ensure_viewer(serial)
     payload = args.bundle.read_bytes()
     digest = hashlib.sha256(payload).hexdigest()
     token = uuid.uuid4().hex
     incoming = f"files/incoming-{token}.zip"
     temporary = f"{incoming}.tmp"
     status = f"files/status-{token}"
-    try:
-        app_shell(serial, "true")
-    except ValueError as error:
-        raise ValueError(f"Install the hardware preview APK on {serial} first. {error}") from error
     try:
         app_shell(serial, f"mkdir -p files && cat > {temporary} && "
                   f"echo '{digest}  {temporary}' | sha256sum -c && mv {temporary} {incoming}",
@@ -235,11 +270,7 @@ def deploy(args):
 
 def install(args):
     require(args.apk.is_file(), "Provide the downloaded viewer APK")
-    serial = usb_device(args.serial)
-    result = adb_run(["-s", serial, "install", "-r", str(args.apk)], timeout=120)
-    require(b"Success" in result.stdout, result.stdout.decode(errors="replace"))
-    app_shell(serial, "true")
-    print(f"Viewer installed on USB device {serial}")
+    install_viewer(usb_device(args.serial), args.apk)
 
 
 def capture(args):

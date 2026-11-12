@@ -56,7 +56,7 @@ Codex 也支持把整个技能目录放到用户级 `~/.agents/skills/` 下。�
 使用 $skill-installer 安装 https://github.com/liry-go/codex-skills/tree/main/skills/figma-hardware-preview
 ```
 
-样机首次安装 [Android 预览器 APK](https://github.com/liry-go/codex-skills/releases/tag/figma-hardware-preview-v1.0.0)。后续提供 Figma Frame 链接或本地 PNG 即可通过 USB 更新画面。默认静态展示，按需应用用户指定的按钮范式。Figma 工具必须限制在只读白名单内。详见 [安装和使用](skills/figma-hardware-preview/references/setup.md)。
+提供 Figma Frame 链接或本地 PNG 即可通过 USB 更新画面。样机首次部署时，Skill 会自动下载、校验并安装预览器。默认静态展示，按需应用用户指定的按钮范式。Figma 工具必须限制在只读白名单内。详见 [安装和使用](skills/figma-hardware-preview/references/setup.md)。
 
 预览器源码在 [android/figma-hardware-preview](android/figma-hardware-preview)。构建需要 JDK 17+、Android SDK 35 和 Build Tools 35.0.0。在该目录执行 `./gradlew :app:assembleRelease :app:lintRelease`。发布时用 Android SDK 的 `zipalign` 与 `apksigner` 对齐并签名 APK。升级沿用原发布签名。
 
