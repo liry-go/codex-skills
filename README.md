@@ -62,7 +62,7 @@ Codex 也支持把整个技能目录放到用户级 `~/.agents/skills/` 下。�
 
 ## 更新技能
 
-通过安装器安装的副本不会随着本仓库更新而自动更新。需要新版本时，可让 Codex 对比仓库版本与本机版本，保留本地定制后更新。
+可以让 Codex 对比仓库和本机的 Skill 版本，保留本地定制后更新。对于 `figma-hardware-preview`，直接发送 [更新提示词](skills/figma-hardware-preview/references/setup.md#更新已有-skill) 即可。
 
 ## 目录结构
 

@@ -16,11 +16,13 @@
 
 ## 更新已有 Skill
 
-已安装的副本需要手动更新。把下面的请求发给 Codex，让它先备份旧目录到 Skill 搜索路径之外，再安装 GitHub `main` 上的版本。完成后开启新对话。
+已安装的同事把下面这句话发给 Codex。Codex 下载并检查新版后会替换本机副本。更新完成后开启新对话。
 
 ```text
-请更新已安装的 figma-hardware-preview。先把旧版目录备份到 Codex 的 skills 目录之外，再用 $skill-installer 安装 https://github.com/liry-go/codex-skills/tree/main/skills/figma-hardware-preview。安装失败时恢复旧版。
+请从 https://github.com/liry-go/codex-skills/tree/main/skills/figma-hardware-preview 直接更新我已安装的 figma-hardware-preview。下载并检查新版后，再替换本机副本。
 ```
+
+安装器遇到同名目录会退出。执行更新时，先用安装器的 `--dest` 把新版装到临时目录，检查 `SKILL.md` 和随附脚本，再替换实际生效的 Skill 目录。替换失败时恢复原目录。遇到本机定制时保留这些改动。
 
 用 Figma 链接取图时，按首次安装的第 4 步核对生效的白名单。对要求文件会话的连接器，只给原白名单增加 `create_session`，然后重新加载 MCP。会话只用于读取用户指定的画板或素材。
 
