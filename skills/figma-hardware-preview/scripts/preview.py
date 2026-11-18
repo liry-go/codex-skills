@@ -140,8 +140,8 @@ def atomic_write(path, write):
         temporary.unlink(missing_ok=True)
 
 
-def pack(args):
-    buttons = json.loads(args.buttons.read_text(encoding="utf-8")) if args.buttons else []
+def build_bundle(screen, buttons_path=None):
+    buttons = json.loads(buttons_path.read_text(encoding="utf-8")) if buttons_path else []
     manifest = {"schema": 1, "buttons": buttons}
     manifest_bytes = json.dumps(manifest, ensure_ascii=False).encode()
     require(len(manifest_bytes) <= MAX_MANIFEST, "Button manifest exceeds 64 KiB")
@@ -150,7 +150,7 @@ def pack(args):
 
     def read(name):
         nonlocal total
-        path = args.screen if name == "screen.png" else args.buttons.parent / name
+        path = screen if name == "screen.png" else buttons_path.parent / name
         total += path.stat().st_size
         require(total <= MAX_BUNDLE, "Preview exceeds 24 MiB")
         files[name] = path.read_bytes()
@@ -158,15 +158,19 @@ def pack(args):
 
     validate(manifest, read)
 
-    def write(path):
-        with zipfile.ZipFile(path, "x") as bundle:
-            bundle.writestr("preview.json", manifest_bytes)
-            for name, data in files.items():
-                bundle.writestr(name, data)
-        require(path.stat().st_size <= MAX_BUNDLE, "Preview exceeds 24 MiB including ZIP headers")
+    payload = BytesIO()
+    with zipfile.ZipFile(payload, "w") as bundle:
+        bundle.writestr("preview.json", manifest_bytes)
+        for name, data in files.items():
+            bundle.writestr(name, data)
+    require(payload.tell() <= MAX_BUNDLE, "Preview exceeds 24 MiB including ZIP headers")
+    return payload.getvalue(), len(buttons)
 
-    atomic_write(args.out, write)
-    print(f"Packed {len(buttons)} button(s) into {args.out}")
+
+def pack(args):
+    payload, button_count = build_bundle(args.screen, args.buttons)
+    atomic_write(args.out, lambda path: path.write_bytes(payload))
+    print(f"Packed {button_count} button(s) into {args.out}")
 
 
 def verify_bundle(path):
@@ -296,11 +300,7 @@ def ensure_viewer(serial):
         install_viewer(serial, apk)
 
 
-def deploy(args):
-    verify_bundle(args.bundle)
-    serial = usb_device(args.serial)
-    ensure_viewer(serial)
-    payload = args.bundle.read_bytes()
+def send_preview(serial, payload):
     digest = hashlib.sha256(payload).hexdigest()
     token = uuid.uuid4().hex
     incoming = f"files/incoming-{token}.zip"
@@ -319,7 +319,7 @@ def deploy(args):
             if result.returncode == 0:
                 response = result.stdout.decode(errors="replace").strip()
                 require(response == "ok", response or "Viewer rejected the preview")
-                print(f"Preview displayed on USB device {serial}")
+                print(f"Preview displayed on USB device {serial}", flush=True)
                 return
             time.sleep(0.25)
         raise ValueError("Viewer did not acknowledge the preview. Check its screen and retry.")
@@ -336,12 +336,36 @@ def install(args):
     install_viewer(usb_device(args.serial), args.apk)
 
 
-def capture(args):
+def deploy(args):
+    verify_bundle(args.bundle)
     serial = usb_device(args.serial)
+    ensure_viewer(serial)
+    send_preview(serial, args.bundle.read_bytes())
+
+
+def capture_screen(serial, path):
     data = adb_run(["-s", serial, "exec-out", "screencap", "-p"]).stdout
     width, height = png_size(data, "device screenshot")
-    atomic_write(args.out, lambda path: path.write_bytes(data))
-    print(f"Captured {width} × {height} screen from {serial} to {args.out}")
+    atomic_write(path, lambda temp: temp.write_bytes(data))
+    print(f"Captured {width} × {height} screen from {serial} to {path}")
+
+
+def capture(args):
+    capture_screen(usb_device(args.serial), args.out)
+
+
+def quick(args):
+    if args.capture:
+        require(args.capture.resolve() != args.screen.resolve(),
+                "Save the device screenshot to a different path than the source PNG.")
+    payload, _ = build_bundle(args.screen)
+    serial = usb_device(args.serial)
+    require(app_shell(serial, "true", check=False).returncode == 0,
+            f"Static quick preview requires the installed, ADB-accessible viewer on {serial}. "
+            "Use the regular deployment workflow to set up the viewer if needed.")
+    send_preview(serial, payload)
+    if args.capture:
+        capture_screen(serial, args.capture)
 
 
 def main():
@@ -352,6 +376,12 @@ def main():
     pack_parser.add_argument("--buttons", type=Path)
     pack_parser.add_argument("--out", type=Path, required=True)
     pack_parser.set_defaults(run=pack)
+
+    quick_parser = actions.add_parser("quick", help="Show a static PNG using the installed USB viewer")
+    quick_parser.add_argument("--screen", type=Path, required=True)
+    quick_parser.add_argument("--serial")
+    quick_parser.add_argument("--capture", type=Path, metavar="PNG", help="Save a device screenshot after display")
+    quick_parser.set_defaults(run=quick)
 
     for name, func, path_option in (("install", install, "--apk"),
                                      ("deploy", deploy, "--bundle"),
